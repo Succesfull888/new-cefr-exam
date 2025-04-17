@@ -16,7 +16,7 @@ export const showNotification = (message, options = {}) => {
 };
 
 const api = axios.create({
-  baseURL: process.env.NODE_ENV === 'production' ? '' : 'https://cefr-speaking-exam.onrender.com',
+  baseURL: process.env.NODE_ENV === 'production' ? '' : 'https://new-cefr-exam.vercel.app/',
   headers: {
     'Content-Type': 'application/json'
   }
