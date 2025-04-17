@@ -1,0 +1,43 @@
+# ===================
+# Node modules
+# ===================
+client/node_modules/
+server/node_modules/
+node_modules/
+
+# ===================
+# Environment variables
+# ===================
+.env
+client/.env
+server/.env
+
+# ===================
+# Build/output folders
+# ===================
+client/build/
+server/dist/
+dist/
+build/
+
+# ===================
+# Logs
+# ===================
+*.log
+npm-debug.log*
+
+# ===================
+# System/IDE junk
+# ===================
+.DS_Store
+.vscode/
+*.swp
+*.swo
+*.idea/
+*.iml
+
+# ===================
+# Coverage reports
+# ===================
+coverage/
+*.lcov

@@ -1,0 +1,15 @@
+{
+    "name": "cefr-speaking-exam",
+    "version": "1.0.0",
+    "description": "CEFR Speaking Exam platform",
+    "scripts": {
+      "start": "cd server && npm start",
+      "server": "cd server && npm run dev",
+      "client": "cd client && npm start",
+      "dev": "concurrently \"npm run server\" \"npm run client\"",
+      "install-all": "npm install && cd client && npm install && cd ../server && npm install"
+    },
+    "devDependencies": {
+      "concurrently": "^8.0.1"
+    }
+  }
