@@ -16,7 +16,7 @@ export const showNotification = (message, options = {}) => {
 };
 
 const api = axios.create({
-  baseURL: process.env.NODE_ENV === 'production' ? '' : 'http://localhost:5000',
+  baseURL: process.env.NODE_ENV === 'production' ? '' : 'https://new-cefr-exam.onrender.com',
   headers: {
     'Content-Type': 'application/json'
   }
