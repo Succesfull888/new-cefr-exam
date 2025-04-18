@@ -16,12 +16,9 @@ export const showNotification = (message, options = {}) => {
 };
 
 const api = axios.create({
-  baseURL: process.env.REACT_APP_API_URL,
+  baseURL: process.env.REACT_APP_API_URL || 'http://localhost:5000', // Default qiymat ham bering
   withCredentials: true
 });
-
-export default api;
-
 
 // Add request interceptor to attach auth token
 api.interceptors.request.use(
