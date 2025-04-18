@@ -16,11 +16,12 @@ export const showNotification = (message, options = {}) => {
 };
 
 const api = axios.create({
-  baseURL: process.env.NODE_ENV === 'production' ? '' : 'https://multilevel-speaking.onrender.com',
-  headers: {
-    'Content-Type': 'application/json'
-  }
+  baseURL: process.env.REACT_APP_API_URL,
+  withCredentials: true
 });
+
+export default api;
+
 
 // Add request interceptor to attach auth token
 api.interceptors.request.use(
