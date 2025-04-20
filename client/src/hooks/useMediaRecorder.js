@@ -14,9 +14,9 @@ const useMediaRecorder = () => {
   const audioSourceNode = useRef(null);
   const audioContext = useRef(null);
   
-  // Тозалаш функцияси - бу жуда муҳим
+  // Tozalash funktsiyasi - bu juda muhim
   const cleanup = () => {
-    // MediaRecorder тўхтатиш
+    // MediaRecorder to'xtatish
     if (mediaRecorder.current && (recording || mediaRecorder.current.state === 'recording')) {
       try {
         mediaRecorder.current.stop();
@@ -25,13 +25,13 @@ const useMediaRecorder = () => {
       }
     }
     
-    // Таймерни тўхтатиш
+    // Taymerni to'xtatish
     if (timerInterval.current) {
       clearInterval(timerInterval.current);
       timerInterval.current = null;
     }
     
-    // Барча аудио треклани тўхтатиш
+    // Barcha audio treklarni to'xtatish
     if (streamRef.current) {
       try {
         const tracks = streamRef.current.getTracks();
@@ -45,7 +45,7 @@ const useMediaRecorder = () => {
       }
     }
     
-    // Аудио контекст тозалаш
+    // Audio kontekst tozalash
     if (audioSourceNode.current) {
       try {
         audioSourceNode.current.disconnect();
@@ -64,194 +64,215 @@ const useMediaRecorder = () => {
       }
     }
     
-    // URL ни бекор қилиш
+    // URL ni bekor qilish
     if (audioURL) {
       URL.revokeObjectURL(audioURL);
     }
   };
   
-  // Компонент тугаганда тозалаш
+  // Komponent tugaganda tozalash
   useEffect(() => {
+    // Mikrofon ruxsatini komponent yuklanishida so'rash
+    const requestInitialPermission = async () => {
+      try {
+        const initialStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        console.log("Initial microphone permission granted");
+        
+        // Ruxsat olish uchun yaratilgan stream treklar to'xtatish
+        initialStream.getTracks().forEach(track => track.stop());
+      } catch (err) {
+        console.error("Initial permission request failed:", err);
+      }
+    };
+    
+    requestInitialPermission();
+    
     return () => {
       cleanup();
     };
   }, []);
   
-  // Файлни сақлаш функцияси
+  // Faylni saqlash funktsiyasi
   const downloadBlob = (blob, filename) => {
-    // Файлни сақлаш учун элемент
+    // Faylni saqlash uchun element
     const a = document.createElement('a');
     document.body.appendChild(a);
     a.style.display = 'none';
     
-    // URL яратиш ва юклаш
+    // URL yaratish va yuklash
     const url = window.URL.createObjectURL(blob);
     a.href = url;
     a.download = filename || 'recording.mp3';
     a.click();
     
-    // Тозалаш
+    // Tozalash
     window.URL.revokeObjectURL(url);
     document.body.removeChild(a);
   };
   
-  // Микрофон ва браузер қўллаб-қувватлашини текшириш
+  // Mikrofon va brauzer qo'llab-quvvatlashini tekshirish
   const checkSupport = async () => {
-    // MediaRecorder қўллаб-қувватлашини текшириш
+    // MediaRecorder qo'llab-quvvatlashini tekshirish
     if (!window.MediaRecorder) {
       throw new Error('MediaRecorder API is not supported in this browser');
     }
     
-    // Микрофон рухсатини текшириш
+    // Mikrofon ruxsatini tekshirish
     try {
       await navigator.mediaDevices.getUserMedia({ audio: true });
       return true;
     } catch (err) {
       if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
-        throw new Error('Microphone permission denied');
+        throw new Error('Mikrofondan foydalanish uchun ruxsat berilmadi. Iltimos, mikrofonni ruxsat bering.');
       } else if (err.name === 'NotFoundError' || err.name === 'DevicesNotFoundError') {
-        throw new Error('No microphone found');
+        throw new Error('Mikrofon topilmadi. Mikrofoningiz ulangan ekanligini tekshiring.');
       } else {
         throw err;
       }
     }
   };
   
-  // Ёзиб олишни бошлаш - бундан олдин тўлиқ тозаланиб олинади
+  // Yozib olishni boshlash - bundan oldin to'liq tozalanib olinadi
   const startRecording = async () => {
     try {
-      // Аввал барча ресурсларни тозалаш
+      // Avval barcha resurslarni tozalash
       cleanup();
       
-      // Статус ўзгартириш
+      // Status o'zgartirish
       setError(null);
       setMediaBlob(null);
       setAudioURL(null);
       mediaChunks.current = [];
       
-      // Микрофон рухсатини текшириш
+      // Mikrofon ruxsatini tekshirish
       await checkSupport();
       
       console.log("Starting new recording...");
       
-      // Медиа стрим олиш - аудио берилганларни кўпайтирамиз
+      // Media stream olish - audio berilganlarni ko'paytirish
       const stream = await navigator.mediaDevices.getUserMedia({ 
         audio: {
           echoCancellation: true,
           noiseSuppression: true,
           autoGainControl: true,
-          channelCount: 1,             // Монорежим
-          sampleRate: 44100,           // CD сифати
-          sampleSize: 16               // 16 бит
+          channelCount: 1,           // Monorejim
+          sampleRate: 44100          // CD sifati
         },
         video: false
       });
       
       streamRef.current = stream;
       
-      // Аудио сифатини яхшилаш учун WebAudio API ишлатамиз
-      audioContext.current = new (window.AudioContext || window.webkitAudioContext)();
-      audioSourceNode.current = audioContext.current.createMediaStreamSource(stream);
+      // Audio treklarini tekshirish
+      const audioTracks = stream.getAudioTracks();
+      console.log(`Audio tracks: ${audioTracks.length}`);
+      audioTracks.forEach((track, i) => {
+        console.log(`Track ${i}: enabled=${track.enabled}, kind=${track.kind}, label=${track.label}`);
+      });
       
-      // Аудио баландлигини кузатиш
-      const analyser = audioContext.current.createAnalyser();
-      analyser.fftSize = 256;
-      audioSourceNode.current.connect(analyser);
-      
-      const bufferLength = analyser.frequencyBinCount;
-      const dataArray = new Uint8Array(bufferLength);
-      
-      // Аудио баландлиги текшируви
-      const checkAudioLevel = () => {
-        if (!analyser) return;
+      // Audio sifatini yaxshilash uchun WebAudio API ishlatish
+      try {
+        audioContext.current = new (window.AudioContext || window.webkitAudioContext)();
+        audioSourceNode.current = audioContext.current.createMediaStreamSource(stream);
         
-        analyser.getByteFrequencyData(dataArray);
-        let sum = 0;
-        for (let i = 0; i < bufferLength; i++) {
-          sum += dataArray[i];
+        // Audio balandligini kuzatish
+        const analyser = audioContext.current.createAnalyser();
+        analyser.fftSize = 256;
+        audioSourceNode.current.connect(analyser);
+        
+        const bufferLength = analyser.frequencyBinCount;
+        const dataArray = new Uint8Array(bufferLength);
+        
+        // Audio balandligi tekshiruvi
+        const checkAudioLevel = () => {
+          if (!analyser) return;
+          
+          analyser.getByteFrequencyData(dataArray);
+          let sum = 0;
+          for (let i = 0; i < bufferLength; i++) {
+            sum += dataArray[i];
+          }
+          const average = sum / bufferLength;
+          
+          // Agat mikrofon juda past ovozda ishlayotgan bo'lsa
+          if (average < 5 && recording) {
+            console.warn("WARNING: Microphone level is very low or muted!");
+          }
+          
+          if (recording) {
+            requestAnimationFrame(checkAudioLevel);
+          }
+        };
+        
+        // Audio destination yaratish
+        const destination = audioContext.current.createMediaStreamDestination();
+        audioSourceNode.current.connect(destination);
+        
+        // MediaRecorder yaratish - bu destination orqali bo'ladi
+        // Eng yaxshi format tanlash
+        let options = {};
+        
+        // Formatlarni tekshirish
+        if (MediaRecorder.isTypeSupported('audio/webm')) {
+          options = { mimeType: 'audio/webm', audioBitsPerSecond: 128000 };
+          console.log("Using WebM format");
+        } 
+        else if (MediaRecorder.isTypeSupported('audio/mp3')) {
+          options = { mimeType: 'audio/mp3', audioBitsPerSecond: 128000 };
+          console.log("Using MP3 format");
         }
-        const average = sum / bufferLength;
-        
-        // Натижаларни логлаш
-        console.log("Mic level:", average);
-        
-        // Агар микрофон жуда паст овозда ишлаётган бўлса
-        if (average < 5) {
-          console.warn("WARNING: Microphone level is very low or muted!");
+        else if (MediaRecorder.isTypeSupported('audio/wav')) {
+          options = { mimeType: 'audio/wav', audioBitsPerSecond: 128000 };
+          console.log("Using WAV format");
+        }
+        else {
+          console.log("Using browser default format");
         }
         
-        if (recording) {
-          requestAnimationFrame(checkAudioLevel);
-        }
-      };
-      
-      // Аудио destination яратиш
-      const destination = audioContext.current.createMediaStreamDestination();
-      audioSourceNode.current.connect(destination);
-      
-      // Энг яхши формат танлаш
-      let options = {};
-      
-      // Форматларни текшириш
-      if (MediaRecorder.isTypeSupported('audio/wav')) {
-        options = { mimeType: 'audio/wav', audioBitsPerSecond: 128000 };
-        console.log("Using WAV format");
-      } 
-      else if (MediaRecorder.isTypeSupported('audio/mp3')) {
-        options = { mimeType: 'audio/mp3', audioBitsPerSecond: 128000 };
-        console.log("Using MP3 format");
-      }
-      else if (MediaRecorder.isTypeSupported('audio/webm')) {
-        options = { mimeType: 'audio/webm', audioBitsPerSecond: 256000 };
-        console.log("Using WebM format with higher bitrate");
-      }
-      else {
-        console.log("Using browser default format");
+        mediaRecorder.current = new MediaRecorder(destination.stream, options);
+        
+        // Audio levelni kuzatishni boshlash
+        checkAudioLevel();
+      } catch (audioCtxError) {
+        console.error("WebAudio API error, falling back to direct recording:", audioCtxError);
+        // WebAudio API ishlamasa, to'g'ridan-to'g'ri MediaRecorder ishlatish
+        mediaRecorder.current = new MediaRecorder(stream);
       }
       
-      // MediaRecorder яратиш - бу destination орқали бўлади
-      mediaRecorder.current = new MediaRecorder(destination.stream, options);
-      
-      // Тўғри чанклар олиш учун интервални камайтирамиз
+      // To'g'ri chunklar olish uchun intervalni kamaytiramiz
       mediaRecorder.current.ondataavailable = (event) => {
-        console.log(`Chunk received: ${event.data.size} bytes, type: ${event.data.type}`);
         if (event.data && event.data.size > 0) {
+          console.log(`Chunk received: ${event.data.size} bytes`);
           mediaChunks.current.push(event.data);
         }
       };
       
-      // Хатоларни тутиб олиш
+      // Xatolarni tutib olish
       mediaRecorder.current.onerror = (event) => {
         console.error("MediaRecorder error:", event);
         setError(`Recording error: ${event.error?.message || "unknown"}`);
         cleanup();
       };
       
-      // Ёзиб олиш тугаганда
+      // Yozib olish tugaganda
       mediaRecorder.current.onstop = () => {
         console.log(`Recording stopped. Collected ${mediaChunks.current.length} chunks`);
         
         if (mediaChunks.current.length > 0) {
           try {
-            // Аудио блоб яратиш - турини тўғри ўрнатиш билан
-            const mimeType = mediaRecorder.current.mimeType || 'audio/wav';
+            // Audio blob yaratish - turini to'g'ri o'rnatish bilan
+            const mimeType = mediaRecorder.current.mimeType || 'audio/webm';
             console.log(`Creating blob with type: ${mimeType}`);
             
             const blob = new Blob(mediaChunks.current, { type: mimeType });
             console.log(`Created blob: ${blob.size} bytes`);
             
-            // Тест учун аудиони тўғридан-тўғри юклаб олиш
-            // Номи timestamp билан бўлади
-            const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-            // Файлни сақлаш - текшириш учун
-            // downloadBlob(blob, `recording-${timestamp}.${mimeType.split('/')[1]}`);
-            
             if (blob.size > 0) {
-              // URL яратиш
+              // URL yaratish
               const url = URL.createObjectURL(blob);
               setAudioURL(url);
               
-              // Аудио тестлаш
+              // Audio testlash
               const testAudio = new Audio(url);
               testAudio.onloadedmetadata = () => {
                 console.log(`Test audio duration: ${testAudio.duration}s`);
@@ -260,7 +281,7 @@ const useMediaRecorder = () => {
                 }
               };
               
-              // Base64 форматга ўтказиш
+              // Base64 formatga o'tkazish
               const reader = new FileReader();
               reader.onloadend = () => {
                 const base64data = reader.result;
@@ -277,20 +298,17 @@ const useMediaRecorder = () => {
           }
         } else {
           console.error("No audio data was collected!");
-          setError("No audio data was recorded. Please check your microphone.");
+          setError("Audio ma'lumotlari yozib olinmadi. Mikrofoningizni tekshiring.");
         }
       };
       
-      // Ёзиб олишни бошлаш
-      // Тез-тез чунклар олиш учун 100ms интервалда
+      // Yozib olishni boshlash
+      // Tez-tez chunklar olish uchun 100ms intervalda
       mediaRecorder.current.start(100);
       setRecording(true);
       console.log("Recording started successfully");
       
-      // Аудио баландлигини кузатишни бошлаш
-      checkAudioLevel();
-      
-      // Таймерни бошлаш
+      // Taymerni boshlash
       setRecordingTime(0);
       timerInterval.current = setInterval(() => {
         setRecordingTime(prev => prev + 1);
@@ -303,24 +321,24 @@ const useMediaRecorder = () => {
     }
   };
   
-  // Ёзиб олишни тўхтатиш
+  // Yozib olishni to'xtatish
   const stopRecording = () => {
     console.log("Stopping recording...");
     try {
       if (mediaRecorder.current && (recording || mediaRecorder.current.state === 'recording')) {
-        // Сўнгги чанкни олиш
+        // So'nggi chunkni olish
         mediaRecorder.current.requestData();
         
-        // Ёзувни тўхтатиш
+        // Yozuvni to'xtatish
         mediaRecorder.current.stop();
         console.log("MediaRecorder stopped");
         
-        // Аудио треклар тўхтатиш
+        // Audio treklar to'xtatish
         if (streamRef.current) {
           streamRef.current.getTracks().forEach(track => track.stop());
         }
         
-        // Таймер тўхтатиш
+        // Taymer to'xtatish
         if (timerInterval.current) {
           clearInterval(timerInterval.current);
           timerInterval.current = null;
@@ -337,14 +355,14 @@ const useMediaRecorder = () => {
     }
   };
   
-  // Ёзиб олинган маълумотларни тозалаш
+  // Yozib olingan ma'lumotlarni tozalash
   const resetRecording = () => {
-    // Ресурсларни озод қилиш 
+    // Resurslarni ozod qilish 
     if (audioURL) {
       URL.revokeObjectURL(audioURL);
     }
     
-    // Ҳолатни тозалаш
+    // Holatni tozalash
     setAudioURL(null);
     setMediaBlob(null);
     setRecordingTime(0);
@@ -352,7 +370,7 @@ const useMediaRecorder = () => {
     mediaChunks.current = [];
   };
   
-  // Ёзиб олинган аудиони ўйнатиш
+  // Yozib olingan audioni o'ynatish
   const playRecording = () => {
     console.log("Playing recording");
     
@@ -360,7 +378,7 @@ const useMediaRecorder = () => {
       try {
         const audio = new Audio();
         
-        // Хатоларни аниқлаш
+        // Xatolarni aniqlash
         audio.onerror = (e) => {
           console.error("Audio playback error:", e);
           setError(`Error playing audio: ${audio.error?.message || "unknown error"}`);
@@ -371,13 +389,13 @@ const useMediaRecorder = () => {
         audio.onplay = () => console.log("Audio playback started");
         audio.onended = () => console.log("Audio playback completed");
         
-        // Максимал баландлик
+        // Maksimal balandlik
         audio.volume = 1.0;
         
-        // Манбани ўрнатиш
+        // Manbani o'rnatish
         audio.src = audioURL;
         
-        // Мусиқани ўйнатиш
+        // Musiqani o'ynatish
         const playPromise = audio.play();
         
         if (playPromise !== undefined) {
@@ -388,12 +406,12 @@ const useMediaRecorder = () => {
             .catch(err => {
               console.error("Error playing audio:", err);
               
-              // Фойдаланувчи интеракцияси автоплей учун
+              // Foydalanuvchi interaktsiyasi autoplay uchun
               if (err.name === 'NotAllowedError') {
                 console.log("Autoplay was prevented");
-                alert("Please click to play audio");
+                setError("Audio o'ynatish uchun sahifada bir joyga bosing");
                 
-                // Кликдан кейин ўйнатиш
+                // Klikdan keyin o'ynatish
                 const playOnClick = () => {
                   audio.play().catch(e => {
                     console.error("Play error after click:", e);
@@ -415,7 +433,7 @@ const useMediaRecorder = () => {
         return null;
       }
     } else if (mediaBlob) {
-      // Base64 дан аудио яратиш
+      // Base64 dan audio yaratish
       try {
         const parts = mediaBlob.split(',');
         const byteString = atob(parts[1]);
@@ -436,19 +454,19 @@ const useMediaRecorder = () => {
         audio.src = url;
         audio.volume = 1.0;
         
-        // Хатолар учун текшириш
+        // Xatolar uchun tekshirish
         audio.onerror = (e) => {
           console.error("Audio playback error:", e);
           setError(`Error playing audio: ${audio.error?.message || "unknown error"}`);
         };
         
-        // Ўйнатиш
+        // O'ynatish
         audio.play().catch(err => {
           console.error("Error playing from base64:", err);
           
           if (err.name === 'NotAllowedError') {
             console.log("Autoplay prevented, waiting for user interaction");
-            alert("Please click to play audio");
+            setError("Audio o'ynatish uchun sahifada bir joyga bosing");
             
             const playOnClick = () => {
               audio.play().catch(e => {
@@ -470,17 +488,17 @@ const useMediaRecorder = () => {
         return null;
       }
     } else {
-      setError("No recording to play");
+      setError("Hozir o'ynatish uchun audio yo'q");
       return null;
     }
   };
   
-  // Аудиони юклаб олиш
+  // Audioni yuklab olish
   const saveRecording = (filename = 'recording.wav') => {
     if (mediaChunks.current.length > 0) {
       try {
-        // WAV форматда юклаш
-        const blob = new Blob(mediaChunks.current, { type: 'audio/wav' });
+        const mimeType = mediaRecorder.current?.mimeType || 'audio/webm';
+        const blob = new Blob(mediaChunks.current, { type: mimeType });
         downloadBlob(blob, filename);
         return true;
       } catch (e) {
@@ -490,7 +508,6 @@ const useMediaRecorder = () => {
       }
     } else if (audioURL) {
       try {
-        // AudioURL орқали юклаш
         fetch(audioURL)
           .then(res => res.blob())
           .then(blob => {
@@ -503,7 +520,7 @@ const useMediaRecorder = () => {
         return false;
       }
     } else {
-      setError("No recording to save");
+      setError("Hozir yuklab olish uchun audio yo'q");
       return false;
     }
   };
@@ -518,7 +535,7 @@ const useMediaRecorder = () => {
     stopRecording,
     resetRecording,
     playRecording,
-    saveRecording  // Янги экспорт қилинган файлни сақлаш функцияси
+    saveRecording
   };
 };
 
