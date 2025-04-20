@@ -19,7 +19,11 @@ import AdminExamEdit from './pages/admin/AdminExamEdit';
 import AdminExamEvaluate from './pages/admin/AdminExamEvaluate';
 import NotFound from './pages/NotFound';
 import Loading from './components/ui/Loading';
+// App.js yoki routing qismida
+import ExamReview from './pages/ExamReview';
 
+// Routes qismida
+<Route path="/exams/:id" element={<ExamReview />} />
 function App() {
   const [darkMode, setDarkMode] = useState(localStorage.getItem('darkMode') === 'true');
   
