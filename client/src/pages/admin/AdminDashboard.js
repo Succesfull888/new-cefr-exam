@@ -13,30 +13,43 @@ const AdminDashboard = () => {
   });
   const [recentExams, setRecentExams] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   
   useEffect(() => {
     const fetchDashboardData = async () => {
       try {
+        setLoading(true);
+        setError(null);
+        
         // Fetch statistics
         const usersRes = await api.get('/api/admin/users');
         const examsRes = await api.get('/api/admin/exams');
         
+        const usersData = Array.isArray(usersRes.data) ? usersRes.data : [];
+        const examsData = Array.isArray(examsRes.data) ? examsRes.data : [];
+        
         setStats({
-          users: usersRes.data.length,
-          exams: examsRes.data.length,
-          pendingEvaluations: examsRes.data.filter(exam => exam.status === 'submitted').length,
-          completedEvaluations: examsRes.data.filter(exam => exam.status === 'evaluated').length
+          users: usersData.length,
+          exams: examsData.length,
+          pendingEvaluations: examsData.filter(exam => exam?.status === 'submitted').length,
+          completedEvaluations: examsData.filter(exam => exam?.status === 'evaluated').length
         });
         
         // Fetch recent exams
-        setRecentExams(examsRes.data
-          .sort((a, b) => new Date(b.submittedAt) - new Date(a.submittedAt))
-          .slice(0, 5)
-        );
+        const sortedExams = [...examsData]
+          .sort((a, b) => {
+            const dateA = a?.submittedAt ? new Date(a.submittedAt) : new Date(0);
+            const dateB = b?.submittedAt ? new Date(b.submittedAt) : new Date(0);
+            return dateB - dateA;
+          })
+          .slice(0, 5);
+          
+        setRecentExams(sortedExams);
         
         setLoading(false);
       } catch (err) {
         console.error('Admin dashboard data fetch error:', err);
+        setError('Failed to load dashboard data. Please try again.');
         setLoading(false);
       }
     };
@@ -48,6 +61,26 @@ const AdminDashboard = () => {
     return <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '80vh' }}>
       <CircularProgress />
     </Box>;
+  }
+
+  if (error) {
+    return (
+      <Container maxWidth="md">
+        <Box sx={{ my: 4, textAlign: 'center' }}>
+          <Typography variant="h5" color="error" gutterBottom>
+            {error}
+          </Typography>
+          <Button 
+            variant="contained" 
+            color="primary" 
+            onClick={() => window.location.reload()}
+            sx={{ mt: 2 }}
+          >
+            Retry
+          </Button>
+        </Box>
+      </Container>
+    );
   }
   
   return (
@@ -157,18 +190,18 @@ const AdminDashboard = () => {
               ) : (
                 <List>
                   {recentExams.map(exam => (
-                    <ListItem disablePadding key={exam._id}>
-                      <ListItemButton component={RouterLink} to={`/admin/exams/evaluate/${exam._id}`}>
+                    <ListItem disablePadding key={exam?._id || `exam-${Math.random()}`}>
+                      <ListItemButton component={RouterLink} to={`/admin/exams/evaluate/${exam?._id}`}>
                         <ListItemIcon>
-                          {exam.status === 'evaluated' ? <CheckCircle color="success" /> : <HourglassEmpty color="warning" />}
+                          {exam?.status === 'evaluated' ? <CheckCircle color="success" /> : <HourglassEmpty color="warning" />}
                         </ListItemIcon>
                         <ListItemText 
-                          primary={exam.examTemplate.title} 
-                          secondary={`${exam.student.firstName} ${exam.student.lastName} • ${new Date(exam.submittedAt).toLocaleDateString()}`} 
+                          primary={exam?.examTemplate?.title || "Untitled Exam"} 
+                          secondary={`${exam?.student?.firstName || 'Student'} ${exam?.student?.lastName || ''} • ${exam?.submittedAt ? new Date(exam.submittedAt).toLocaleDateString() : 'Unknown date'}`} 
                         />
-                        {exam.status === 'evaluated' && (
+                        {exam?.status === 'evaluated' && (
                           <Typography variant="body2" sx={{ ml: 2 }}>
-                            {exam.totalScore} / 75
+                            {exam?.totalScore || 0} / 75
                           </Typography>
                         )}
                       </ListItemButton>
