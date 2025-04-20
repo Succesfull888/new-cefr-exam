@@ -20,12 +20,13 @@ const AdminDashboard = () => {
     try {
       setLoading(true);
       setError(null);
+      setRecentExams([]); // Reset exams to empty array before fetching
       
       let usersData = [];
       let examsData = [];
       
       try {
-        // Fetch statistics - wrapping in try-catch blocks to handle each API call separately
+        // Fetch users data 
         const usersRes = await api.get('/api/admin/users');
         if (usersRes && usersRes.data) {
           usersData = Array.isArray(usersRes.data) ? usersRes.data : [];
@@ -36,6 +37,7 @@ const AdminDashboard = () => {
       }
       
       try {
+        // Fetch exams data
         const examsRes = await api.get('/api/admin/exams');
         if (examsRes && examsRes.data) {
           examsData = Array.isArray(examsRes.data) ? examsRes.data : [];
@@ -45,31 +47,39 @@ const AdminDashboard = () => {
         // Continue execution even if exams API fails
       }
       
-      // Set stats with whatever data we managed to fetch
+      // Set stats with default values if data not available
       setStats({
-        users: usersData.length || 0,
-        exams: examsData.length || 0,
-        pendingEvaluations: examsData.filter(exam => exam && exam.status === 'submitted').length || 0,
-        completedEvaluations: examsData.filter(exam => exam && exam.status === 'evaluated').length || 0
+        users: usersData?.length || 0,
+        exams: examsData?.length || 0,
+        pendingEvaluations: examsData?.filter(exam => exam && exam.status === 'submitted')?.length || 0,
+        completedEvaluations: examsData?.filter(exam => exam && exam.status === 'evaluated')?.length || 0
       });
       
       // Process recent exams if we have any
-      if (examsData.length > 0) {
-        // Safely sort and slice exams
-        const sortedExams = [...examsData]
-          .filter(exam => exam !== null && exam !== undefined) // Remove any null/undefined entries
-          .sort((a, b) => {
-            try {
-              const dateA = a?.submittedAt ? new Date(a.submittedAt) : new Date(0);
-              const dateB = b?.submittedAt ? new Date(b.submittedAt) : new Date(0);
-              return dateB - dateA;
-            } catch (e) {
-              return 0; // Default fallback if comparison fails
-            }
-          })
-          .slice(0, 5);
-          
-        setRecentExams(sortedExams);
+      if (Array.isArray(examsData) && examsData.length > 0) {
+        // Filter out any null or undefined exams and ensure they have required properties
+        const validExams = examsData.filter(exam => 
+          exam !== null && 
+          exam !== undefined
+        );
+        
+        // Sort and get recent exams
+        if (validExams.length > 0) {
+          const sortedExams = [...validExams]
+            .sort((a, b) => {
+              try {
+                const dateA = a?.submittedAt ? new Date(a.submittedAt) : new Date(0);
+                const dateB = b?.submittedAt ? new Date(b.submittedAt) : new Date(0);
+                return dateB - dateA;
+              } catch (e) {
+                console.error('Error during sort:', e);
+                return 0;
+              }
+            })
+            .slice(0, 5);
+            
+          setRecentExams(sortedExams);
+        }
       }
       
       setLoading(false);
@@ -82,7 +92,60 @@ const AdminDashboard = () => {
   
   useEffect(() => {
     fetchDashboardData();
+    
+    // Cleanup function to handle component unmount
+    return () => {
+      // Any cleanup needed
+    };
   }, []);
+  
+  const renderExamItem = (exam, index) => {
+    if (!exam) {
+      return null; // Skip rendering if exam is null
+    }
+    
+    // Safely extract values with fallbacks
+    const examId = exam?._id || '';
+    const examStatus = exam?.status || '';
+    const examTitle = exam?.examTemplate?.title || 'Untitled Exam';
+    const studentName = exam?.student ? 
+      `${exam.student?.firstName || 'Student'} ${exam.student?.lastName || ''}` : 
+      'Unknown Student';
+    const examDate = exam?.submittedAt ? 
+      new Date(exam.submittedAt).toLocaleDateString() : 
+      'Unknown date';
+    const examScore = exam?.totalScore !== undefined ? exam.totalScore : 0;
+    
+    return (
+      <ListItem 
+        disablePadding 
+        key={examId || `exam-${index}-${Math.random()}`}
+        divider={index < recentExams.length - 1}
+      >
+        <ListItemButton 
+          component={RouterLink} 
+          to={`/admin/exams/evaluate/${examId}`}
+          disabled={!examId}
+        >
+          <ListItemIcon>
+            {examStatus === 'evaluated' ? 
+              <CheckCircle color="success" /> : 
+              <HourglassEmpty color="warning" />
+            }
+          </ListItemIcon>
+          <ListItemText 
+            primary={examTitle} 
+            secondary={`${studentName} • ${examDate}`} 
+          />
+          {examStatus === 'evaluated' && (
+            <Typography variant="body2" sx={{ ml: 2 }}>
+              {examScore} / 75
+            </Typography>
+          )}
+        </ListItemButton>
+      </ListItem>
+    );
+  };
   
   if (loading) {
     return (
@@ -184,7 +247,7 @@ const AdminDashboard = () => {
                   {stats.pendingEvaluations}
                 </Typography>
                 <Box sx={{ textAlign: 'center' }}>
-                  <RouterLink to="/admin/exams" style={{ textDecoration: 'none' }}>
+                  <RouterLink to="/admin/exams?status=submitted" style={{ textDecoration: 'none' }}>
                     <Typography variant="body2" color="primary">
                       View Pending Exams
                     </Typography>
@@ -205,7 +268,7 @@ const AdminDashboard = () => {
                   {stats.completedEvaluations}
                 </Typography>
                 <Box sx={{ textAlign: 'center' }}>
-                  <RouterLink to="/admin/exams" style={{ textDecoration: 'none' }}>
+                  <RouterLink to="/admin/exams?status=evaluated" style={{ textDecoration: 'none' }}>
                     <Typography variant="body2" color="primary">
                       View Evaluated Exams
                     </Typography>
@@ -234,43 +297,15 @@ const AdminDashboard = () => {
               </Box>
               <Divider sx={{ mb: 2 }} />
               
-              {recentExams.length === 0 ? (
-                <Typography variant="body1" sx={{ py: 3, textAlign: 'center' }}>No exams submitted yet.</Typography>
+              {Array.isArray(recentExams) && recentExams.length === 0 ? (
+                <Typography variant="body1" sx={{ py: 3, textAlign: 'center' }}>
+                  No exams submitted yet.
+                </Typography>
               ) : (
-                <List>
-                  {recentExams.map((exam, index) => (
-                    <ListItem 
-                      disablePadding 
-                      key={exam?._id || `exam-${index}-${Math.random()}`}
-                      divider={index < recentExams.length - 1}
-                    >
-                      <ListItemButton 
-                        component={RouterLink} 
-                        to={`/admin/exams/evaluate/${exam?._id || ''}`}
-                        disabled={!exam?._id}
-                      >
-                        <ListItemIcon>
-                          {exam?.status === 'evaluated' ? 
-                            <CheckCircle color="success" /> : 
-                            <HourglassEmpty color="warning" />
-                          }
-                        </ListItemIcon>
-                        <ListItemText 
-                          primary={exam?.examTemplate?.title || "Untitled Exam"} 
-                          secondary={
-                            exam?.student ? 
-                              `${exam.student?.firstName || 'Student'} ${exam.student?.lastName || ''} • ${exam?.submittedAt ? new Date(exam.submittedAt).toLocaleDateString() : 'Unknown date'}` :
-                              'Unknown student • Unknown date'
-                          } 
-                        />
-                        {exam?.status === 'evaluated' && (
-                          <Typography variant="body2" sx={{ ml: 2 }}>
-                            {exam?.totalScore || 0} / 75
-                          </Typography>
-                        )}
-                      </ListItemButton>
-                    </ListItem>
-                  ))}
+                <List sx={{ width: '100%' }}>
+                  {Array.isArray(recentExams) && recentExams.map((exam, index) => 
+                    renderExamItem(exam, index)
+                  )}
                 </List>
               )}
             </Paper>
