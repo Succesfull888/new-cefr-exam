@@ -189,17 +189,17 @@ const useMediaRecorder = () => {
       const destination = audioContext.current.createMediaStreamDestination();
       audioSourceNode.current.connect(destination);
       
-      // Энг яхши формат танлаш - MP3 форматни устун қўямиз
+      // Энг яхши формат танлаш
       let options = {};
       
       // Форматларни текшириш
-      if (MediaRecorder.isTypeSupported('audio/mp3')) {
-        options = { mimeType: 'audio/mp3', audioBitsPerSecond: 128000 };
-        console.log("Using MP3 format");
-      } 
-      else if (MediaRecorder.isTypeSupported('audio/wav')) {
+      if (MediaRecorder.isTypeSupported('audio/wav')) {
         options = { mimeType: 'audio/wav', audioBitsPerSecond: 128000 };
         console.log("Using WAV format");
+      } 
+      else if (MediaRecorder.isTypeSupported('audio/mp3')) {
+        options = { mimeType: 'audio/mp3', audioBitsPerSecond: 128000 };
+        console.log("Using MP3 format");
       }
       else if (MediaRecorder.isTypeSupported('audio/webm')) {
         options = { mimeType: 'audio/webm', audioBitsPerSecond: 256000 };
@@ -234,16 +234,17 @@ const useMediaRecorder = () => {
         if (mediaChunks.current.length > 0) {
           try {
             // Аудио блоб яратиш - турини тўғри ўрнатиш билан
-            const mimeType = mediaRecorder.current.mimeType || 'audio/mp3'; // MP3 формат устун
+            const mimeType = mediaRecorder.current.mimeType || 'audio/wav';
             console.log(`Creating blob with type: ${mimeType}`);
             
             const blob = new Blob(mediaChunks.current, { type: mimeType });
             console.log(`Created blob: ${blob.size} bytes`);
             
-            // Тест учун аудио файл ўлчамини текшириш
-            if (blob.size < 100) {
-              console.warn("WARNING: Created audio blob is very small!");
-            }
+            // Тест учун аудиони тўғридан-тўғри юклаб олиш
+            // Номи timestamp билан бўлади
+            const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+            // Файлни сақлаш - текшириш учун
+            // downloadBlob(blob, `recording-${timestamp}.${mimeType.split('/')[1]}`);
             
             if (blob.size > 0) {
               // URL яратиш
@@ -265,9 +266,6 @@ const useMediaRecorder = () => {
                 const base64data = reader.result;
                 setMediaBlob(base64data);
                 console.log(`Converted to base64, length: ${base64data.length}`);
-                
-                // Тести учун base64 маълумотларни консолда текшириш
-                console.log("Base64 prefix:", base64data.substring(0, 50) + "...");
               };
               reader.readAsDataURL(blob);
             } else {
@@ -378,7 +376,6 @@ const useMediaRecorder = () => {
         
         // Манбани ўрнатиш
         audio.src = audioURL;
-        console.log("Set audio source:", audioURL);
         
         // Мусиқани ўйнатиш
         const playPromise = audio.play();
@@ -420,11 +417,9 @@ const useMediaRecorder = () => {
     } else if (mediaBlob) {
       // Base64 дан аудио яратиш
       try {
-        console.log("Creating audio from base64 data");
         const parts = mediaBlob.split(',');
         const byteString = atob(parts[1]);
         const mimeType = parts[0].match(/:(.*?);/)[1];
-        console.log("Detected MIME type:", mimeType);
         
         const ab = new ArrayBuffer(byteString.length);
         const ia = new Uint8Array(ab);
@@ -434,8 +429,6 @@ const useMediaRecorder = () => {
         }
         
         const blob = new Blob([ab], { type: mimeType });
-        console.log(`Created blob from base64: ${blob.size} bytes`);
-        
         const url = URL.createObjectURL(blob);
         setAudioURL(url);
         
@@ -483,11 +476,11 @@ const useMediaRecorder = () => {
   };
   
   // Аудиони юклаб олиш
-  const saveRecording = (filename = 'recording.mp3') => { // MP3 ни стандарт қиламиз
+  const saveRecording = (filename = 'recording.wav') => {
     if (mediaChunks.current.length > 0) {
       try {
-        // MP3 форматда юклаш
-        const blob = new Blob(mediaChunks.current, { type: 'audio/mp3' });
+        // WAV форматда юклаш
+        const blob = new Blob(mediaChunks.current, { type: 'audio/wav' });
         downloadBlob(blob, filename);
         return true;
       } catch (e) {
@@ -525,7 +518,7 @@ const useMediaRecorder = () => {
     stopRecording,
     resetRecording,
     playRecording,
-    saveRecording
+    saveRecording  // Янги экспорт қилинган файлни сақлаш функцияси
   };
 };
 
