@@ -95,6 +95,16 @@ const MyExams = () => {
               >
                 Go to Dashboard
               </Button>
+                  // MyExams.js ichida, har bir imtihon uchun
+<Button 
+  variant="outlined" 
+  color="primary" 
+  size="small"
+  component={Link} 
+  to={`/exams/${exam._id}`}
+>
+  View Results
+</Button>
             </Box>
           ) : (
             <TableContainer>
