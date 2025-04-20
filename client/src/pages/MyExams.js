@@ -9,15 +9,29 @@ const MyExams = () => {
   
   const [exams, setExams] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   
   useEffect(() => {
     const fetchExams = async () => {
       try {
+        setLoading(true);
+        setError(null);
+        
         const res = await api.get('/api/exams/my-exams');
-        setExams(res.data);
+        const examsData = Array.isArray(res.data) ? res.data : [];
+        
+        // Exams ma'lumotlarni oxirgi yuborilgan vaqt bo'yicha saralash
+        const sortedExams = [...examsData].sort((a, b) => {
+          const dateA = a?.submittedAt ? new Date(a.submittedAt) : new Date(0);
+          const dateB = b?.submittedAt ? new Date(b.submittedAt) : new Date(0);
+          return dateB - dateA;
+        });
+        
+        setExams(sortedExams);
         setLoading(false);
       } catch (err) {
         console.error('Fetch exams error:', err);
+        setError('Failed to load your exams. Please try again.');
         setLoading(false);
       }
     };
@@ -29,6 +43,26 @@ const MyExams = () => {
     return <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '80vh' }}>
       <CircularProgress />
     </Box>;
+  }
+  
+  if (error) {
+    return (
+      <Container maxWidth="md">
+        <Box sx={{ my: 4, textAlign: 'center' }}>
+          <Typography variant="h5" color="error" gutterBottom>
+            {error}
+          </Typography>
+          <Button 
+            variant="contained" 
+            color="primary" 
+            onClick={() => window.location.reload()}
+            sx={{ mt: 2 }}
+          >
+            Retry
+          </Button>
+        </Box>
+      </Container>
+    );
   }
   
   return (
@@ -76,23 +110,23 @@ const MyExams = () => {
                 </TableHead>
                 <TableBody>
                   {exams.map((exam) => (
-                    <TableRow key={exam._id}>
-                      <TableCell>{exam.examTemplate.title}</TableCell>
-                      <TableCell>{new Date(exam.submittedAt).toLocaleDateString()}</TableCell>
+                    <TableRow key={exam?._id || `exam-${Math.random()}`}>
+                      <TableCell>{exam?.examTemplate?.title || "Untitled Exam"}</TableCell>
+                      <TableCell>{exam?.submittedAt ? new Date(exam.submittedAt).toLocaleDateString() : "Unknown date"}</TableCell>
                       <TableCell>
                         <Chip 
-                          label={exam.status === 'evaluated' ? 'Evaluated' : 'Submitted'} 
-                          color={exam.status === 'evaluated' ? 'success' : 'warning'}
+                          label={exam?.status === 'evaluated' ? 'Evaluated' : 'Submitted'} 
+                          color={exam?.status === 'evaluated' ? 'success' : 'warning'}
                           size="small"
                         />
                       </TableCell>
                       <TableCell>
-                        {exam.status === 'evaluated' ? `${exam.totalScore} / 75` : 'Pending'}
+                        {exam?.status === 'evaluated' ? `${exam?.totalScore || 0} / 75` : 'Pending'}
                       </TableCell>
                       <TableCell align="right">
                         <IconButton
                           color="primary"
-                          onClick={() => navigate(`/exam-result/${exam._id}`)}
+                          onClick={() => navigate(`/exam-result/${exam?._id}`)}
                         >
                           <Visibility />
                         </IconButton>
