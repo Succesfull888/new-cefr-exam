@@ -13,21 +13,31 @@ const Dashboard = () => {
   const [examTemplates, setExamTemplates] = useState([]);
   const [recentExams, setRecentExams] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   
   useEffect(() => {
     const fetchData = async () => {
       try {
         // Fetch exam templates
         const templatesRes = await api.get('/api/exams/templates');
-        setExamTemplates(templatesRes.data);
+        const templatesData = Array.isArray(templatesRes.data) ? templatesRes.data : [];
+        setExamTemplates(templatesData);
+        console.log('Templates loaded:', templatesData.length);
         
         // Fetch recent exams
         const examsRes = await api.get('/api/exams/my-exams');
-        setRecentExams(examsRes.data.slice(0, 3)); // Show only 3 most recent exams
+        const examsData = Array.isArray(examsRes.data) ? examsRes.data : [];
+        setRecentExams(examsData.slice(0, 3)); // Show only 3 most recent exams
+        console.log('Recent exams loaded:', examsData.length);
         
         setLoading(false);
       } catch (err) {
         console.error('Dashboard data fetch error:', err);
+        if (err.response) {
+          console.log('Error response:', err.response.data);
+          console.log('Error status:', err.response.status);
+        }
+        setError('Failed to load dashboard data. Please try again later.');
         setLoading(false);
       }
     };
@@ -41,6 +51,26 @@ const Dashboard = () => {
     </Box>;
   }
   
+  if (error) {
+    return (
+      <Container maxWidth="md">
+        <Box sx={{ my: 4, textAlign: 'center' }}>
+          <Typography variant="h5" color="error" gutterBottom>
+            {error}
+          </Typography>
+          <Button 
+            variant="contained" 
+            color="primary" 
+            onClick={() => window.location.reload()}
+            sx={{ mt: 2 }}
+          >
+            Retry
+          </Button>
+        </Box>
+      </Container>
+    );
+  }
+  
   return (
     <Container maxWidth="lg">
       <Box sx={{ my: 4 }}>
@@ -51,7 +81,7 @@ const Dashboard = () => {
         <Box sx={{ mb: 4 }}>
           <Paper elevation={3} sx={{ p: 3, borderRadius: 2 }}>
             <Typography variant="h5" gutterBottom>
-              Welcome back, {user?.firstName}!
+              Welcome back, {user?.firstName || 'Student'}!
             </Typography>
             <Typography variant="body1">
               Continue practicing your speaking skills with our CEFR-aligned speaking exams.
@@ -73,12 +103,14 @@ const Dashboard = () => {
               ) : (
                 <Grid container spacing={2}>
                   {examTemplates.map(template => (
-                    <Grid item xs={12} sm={6} key={template._id}>
+                    <Grid item xs={12} sm={6} key={template?._id || `template-${Math.random()}`}>
                       <ExamCard
-                        title={template.title}
-                        description={template.description || "Practice your speaking skills with this exam."}
-                        questionCount={template.questions.length}
-                        onStart={() => navigate(`/take-exam/${template._id}`)}
+                        title={template?.title || "Untitled Exam"}
+                        description={template?.description || "Practice your speaking skills with this exam."}
+                        questionCount={template?.questions?.length || 0}
+                        level={template?.level || null}
+                        duration={template?.duration || "20-30"}
+                        onStart={() => navigate(`/take-exam/${template?._id}`)}
                       />
                     </Grid>
                   ))}
@@ -98,33 +130,33 @@ const Dashboard = () => {
               ) : (
                 <Grid container spacing={2}>
                   {recentExams.map(exam => (
-                    <Grid item xs={12} key={exam._id}>
+                    <Grid item xs={12} key={exam?._id || `exam-${Math.random()}`}>
                       <Card variant="outlined">
                         <CardContent>
                           <Typography variant="subtitle1" fontWeight="bold">
-                            {exam.examTemplate.title}
+                            {exam?.examTemplate?.title || "Untitled Exam"}
                           </Typography>
                           <Typography variant="body2" color="textSecondary">
-                            Submitted: {new Date(exam.submittedAt).toLocaleDateString()}
+                            Submitted: {exam?.submittedAt ? new Date(exam.submittedAt).toLocaleDateString() : 'Unknown date'}
                           </Typography>
                           <Box sx={{ mt: 1, display: 'flex', alignItems: 'center' }}>
                             <Typography 
                               variant="body2" 
                               sx={{ 
-                                bgcolor: exam.status === 'evaluated' ? 'success.light' : 'warning.light',
-                                color: exam.status === 'evaluated' ? 'success.contrastText' : 'warning.contrastText',
+                                bgcolor: exam?.status === 'evaluated' ? 'success.light' : 'warning.light',
+                                color: exam?.status === 'evaluated' ? 'success.contrastText' : 'warning.contrastText',
                                 px: 1,
                                 py: 0.5,
                                 borderRadius: 1,
                                 display: 'inline-block'
                               }}
                             >
-                              {exam.status === 'evaluated' ? 'Evaluated' : 'Submitted'}
+                              {exam?.status === 'evaluated' ? 'Evaluated' : 'Submitted'}
                             </Typography>
                             
-                            {exam.status === 'evaluated' && (
+                            {exam?.status === 'evaluated' && (
                               <Typography variant="body2" sx={{ ml: 2, fontWeight: 'bold' }}>
-                                Score: {exam.totalScore} / 75
+                                Score: {exam?.totalScore || 0} / 75
                               </Typography>
                             )}
                           </Box>
@@ -133,7 +165,7 @@ const Dashboard = () => {
                           <Button 
                             size="small" 
                             color="primary"
-                            onClick={() => navigate(`/exam-result/${exam._id}`)}
+                            onClick={() => navigate(`/exam-result/${exam?._id}`)}
                           >
                             View Details
                           </Button>
@@ -167,10 +199,10 @@ const Dashboard = () => {
               
               <Box sx={{ mb: 2 }}>
                 <Typography variant="body1" fontWeight="bold">
-                  Name: {user?.firstName} {user?.lastName}
+                  Name: {user?.firstName || ''} {user?.lastName || ''}
                 </Typography>
                 <Typography variant="body1">
-                  Username: {user?.username}
+                  Username: {user?.username || 'Not available'}
                 </Typography>
               </Box>
               
@@ -223,7 +255,7 @@ const Dashboard = () => {
                 • Listen to native speakers and try to imitate their rhythm and intonation.
               </Typography>
               <Typography variant="body2">
-                • Don't be afraid to make mistakes – they're part of the learning process!
+                • Don't be afraid to make mistakes -- they're part of the learning process!
               </Typography>
             </Paper>
           </Grid>
