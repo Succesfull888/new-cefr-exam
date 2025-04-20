@@ -18,6 +18,9 @@ const Dashboard = () => {
   useEffect(() => {
     const fetchData = async () => {
       try {
+        setLoading(true);
+        setError(null);
+        
         // Fetch exam templates
         const templatesRes = await api.get('/api/exams/templates');
         const templatesData = Array.isArray(templatesRes.data) ? templatesRes.data : [];
@@ -105,11 +108,11 @@ const Dashboard = () => {
                   {examTemplates.map(template => (
                     <Grid item xs={12} sm={6} key={template?._id || `template-${Math.random()}`}>
                       <ExamCard
-                        title={template?.title || "Untitled Exam"}
-                        description={template?.description || "Practice your speaking skills with this exam."}
-                        questionCount={template?.questions?.length || 0}
-                        level={template?.level || null}
-                        duration={template?.duration || "20-30"}
+                        title={template?.title}
+                        description={template?.description}
+                        questionCount={template?.questions?.length}
+                        duration={template?.duration}
+                        level={template?.level}
                         onStart={() => navigate(`/take-exam/${template?._id}`)}
                       />
                     </Grid>
