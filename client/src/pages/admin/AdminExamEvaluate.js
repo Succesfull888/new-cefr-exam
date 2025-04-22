@@ -1,11 +1,15 @@
+// Absolute importlar bilan:
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Container, Box, Typography, Button, Paper, Grid, TextField, Rating, Divider, Accordion, AccordionSummary, AccordionDetails, CircularProgress, Alert, TableContainer, Table, TableHead, TableRow, TableCell, TableBody } from '@mui/material';
+import { Container, Box, Typography, Button, Paper, Grid, TextField, Rating, Divider, 
+         Accordion, AccordionSummary, AccordionDetails, CircularProgress, Alert, 
+         TableContainer, Table, TableHead, TableRow, TableCell, TableBody } from '@mui/material';
 import { ExpandMore, Save, ArrowBack, Person, Mic } from '@mui/icons-material';
-import api from '../../utils/api';
-import QuestionDisplay from '../../components/exam/QuestionDisplay';
+import api from 'utils/api';  // O'ZGARTIRILDI
+import QuestionDisplay from 'components/exam/QuestionDisplay';  // O'ZGARTIRILDI
 import { useSnackbar } from 'notistack';
 
+// Kodning qolgan qismi...
 const AdminExamEvaluate = () => {
   const { id } = useParams();
   const navigate = useNavigate();
