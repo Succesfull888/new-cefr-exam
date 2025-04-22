@@ -4,7 +4,7 @@ import { Container, Box, Typography, Button, Paper, Grid, TextField, Divider,
          Accordion, AccordionSummary, AccordionDetails, CircularProgress, Alert, 
          TableContainer, Table, TableHead, TableRow, TableCell, TableBody } from '@mui/material';
 import { ExpandMore, Save, ArrowBack, Person, Mic } from '@mui/icons-material';
-import api from 'src/utils/api';
+import api from '../../../utils/api';  // TO'G'RILANGAN IMPORT YO'LI
 import { useSnackbar } from 'notistack';
 
 const AdminExamEvaluate = () => {
