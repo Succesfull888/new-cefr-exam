@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Container, Box, Typography, Button, Paper, Grid, TextField, Rating, Divider, Accordion, AccordionSummary, AccordionDetails, CircularProgress, Alert } from '@mui/material';
+import { Container, Box, Typography, Button, Paper, Grid, TextField, Rating, Divider, Accordion, AccordionSummary, AccordionDetails, CircularProgress, Alert, TableContainer, Table, TableHead, TableRow, TableCell, TableBody } from '@mui/material';
 import { ExpandMore, Save, ArrowBack, Person, Mic } from '@mui/icons-material';
 import api from '../../utils/api';
 import QuestionDisplay from '../../components/exam/QuestionDisplay';
@@ -13,7 +13,6 @@ const AdminExamEvaluate = () => {
   
   const [exam, setExam] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null); // Xato holatini saqlash uchun
   const [submitting, setSubmitting] = useState(false);
   const [feedback, setFeedback] = useState([
     { part: 1, score: 0, feedback: '' },
@@ -21,6 +20,7 @@ const AdminExamEvaluate = () => {
     { part: 3, score: 0, feedback: '' }
   ]);
   const [totalScore, setTotalScore] = useState(0);
+  const [error, setError] = useState(null);
   
   // Fetch exam details
   useEffect(() => {
@@ -31,31 +31,28 @@ const AdminExamEvaluate = () => {
         
         console.log('Fetching exam with ID:', id);
         const res = await api.get(`/api/exams/${id}`);
-        console.log('Received exam data:', res.data);
+        console.log('Exam data:', res.data);
         
-        // Ma'lumotlarni tekshirish
         if (!res.data) {
-          throw new Error('No exam data received');
-        }
-        
-        if (!res.data.examTemplate) {
-          throw new Error('Exam template is missing in the data');
+          throw new Error('Exam data is empty');
         }
         
         setExam(res.data);
         
         // If exam is already evaluated, load the feedback
-        if (res.data.status === 'evaluated' && Array.isArray(res.data.feedback) && res.data.feedback.length > 0) {
-          setFeedback(res.data.feedback);
+        if (res.data.status === 'evaluated') {
+          if (Array.isArray(res.data.feedback) && res.data.feedback.length > 0) {
+            setFeedback(res.data.feedback);
+          }
           setTotalScore(res.data.totalScore || 0);
         }
         
         setLoading(false);
       } catch (err) {
         console.error('Error fetching exam:', err);
-        setError(err.message || 'Failed to load exam');
-        setLoading(false);
+        setError('Failed to load exam');
         enqueueSnackbar('Failed to load exam: ' + (err.response?.data?.message || err.message), { variant: 'error' });
+        setLoading(false);
       }
     };
     
@@ -76,7 +73,7 @@ const AdminExamEvaluate = () => {
     setFeedback(updatedFeedback);
     
     // Calculate total score
-    const newTotalScore = updatedFeedback.reduce((sum, item) => sum + Number(item.score || 0), 0);
+    const newTotalScore = updatedFeedback.reduce((sum, item) => sum + item.score, 0);
     setTotalScore(newTotalScore);
   };
   
@@ -84,6 +81,15 @@ const AdminExamEvaluate = () => {
   const handleSubmitEvaluation = async () => {
     try {
       setSubmitting(true);
+      
+      // Validate scores before submitting
+      for (const item of feedback) {
+        if (item.score < 0 || item.score > 25) {
+          enqueueSnackbar(`Part ${item.part} score must be between 0 and 25`, { variant: 'error' });
+          setSubmitting(false);
+          return;
+        }
+      }
       
       await api.put(`/api/exams/${id}/evaluate`, {
         feedback,
@@ -99,46 +105,172 @@ const AdminExamEvaluate = () => {
     }
   };
   
-  // Get responses for a part - Optional chaining bilan yaxshilandi
+  // Get responses for a part - answersdan oladi, agar u mavjud bo'lmasa responsesdan
   const getPartResponses = (part) => {
     if (!exam) return [];
     
-    // ExamTemplate va questions mavjudligini tekshirish
-    if (!exam.examTemplate || !Array.isArray(exam.examTemplate.questions)) {
-      console.warn('ExamTemplate or questions missing');
-      return [];
+    // 1. Yangi answers formatidan olish (afzalroq)
+    if (exam.answers && exam.answers.length > 0) {
+      return exam.answers
+        .filter(answer => answer.questionData && answer.questionData.part === part)
+        .map(answer => ({
+          question: answer.questionData,
+          response: { audioUrl: answer.audioUrl, _id: answer._id }
+        }));
     }
     
+    // 2. Eski responses formatidan olish
     const partQuestions = exam.examTemplate.questions.filter(q => q.part === part);
     const partResponses = [];
     
-    // Agar answers mavjud bo'lsa, u orqali ishlash
-    if (Array.isArray(exam.answers) && exam.answers.length > 0) {
-      const partAnswers = exam.answers.filter(a => a.questionData?.part === part);
-      
-      return partAnswers.map(answer => ({
-        question: answer.questionData,
-        response: {
-          audioUrl: answer.audioUrl,
-          _id: answer._id
-        }
-      }));
-    }
-    
-    // Aks holda eski responses orqali ishlash
-    if (Array.isArray(exam.responses)) {
-      partQuestions.forEach(question => {
-        const response = exam.responses.find(r => r.questionId === question._id);
-        if (response) {
-          partResponses.push({
-            question,
-            response
-          });
-        }
-      });
-    }
+    partQuestions.forEach(question => {
+      const response = exam.responses.find(r => r.questionId === question._id);
+      if (response) {
+        partResponses.push({
+          question,
+          response
+        });
+      }
+    });
     
     return partResponses;
+  };
+  
+  // Savol va uning ma'lumotlarini ko'rsatadigan komponent
+  const renderQuestion = (question, responseAudioUrl) => {
+    // Part 3 uchun - jadval
+    if (question.part === 3 && question.tableData) {
+      return (
+        <Box>
+          <Typography variant="body1" gutterBottom>
+            {question.question}
+          </Typography>
+          
+          <TableContainer component={Paper} sx={{ my: 3 }}>
+            <Table>
+              <TableHead>
+                <TableRow>
+                  <TableCell 
+                    colSpan={question.tableData.columns?.length || 2} 
+                    align="center"
+                  >
+                    <Typography fontWeight="bold">
+                      {question.tableData.topic || "Discussion Topic"}
+                    </Typography>
+                  </TableCell>
+                </TableRow>
+                {Array.isArray(question.tableData.columns) && (
+                  <TableRow>
+                    {question.tableData.columns.map((col, idx) => (
+                      <TableCell key={`col-${idx}`} align="center">
+                        <Typography fontWeight="bold">{col || `Column ${idx+1}`}</Typography>
+                      </TableCell>
+                    ))}
+                  </TableRow>
+                )}
+              </TableHead>
+              <TableBody>
+                {Array.isArray(question.tableData.rows) && 
+                 question.tableData.rows.map((row, rowIdx) => (
+                  <TableRow key={`row-${rowIdx}`}>
+                    {Array.isArray(row) && row.map((cell, cellIdx) => (
+                      <TableCell key={`cell-${rowIdx}-${cellIdx}`}>
+                        {cell || `Cell ${rowIdx}-${cellIdx}`}
+                      </TableCell>
+                    ))}
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </TableContainer>
+          
+          <Box sx={{ mt: 2, display: 'flex', alignItems: 'center' }}>
+            <Mic color="secondary" sx={{ mr: 1 }} />
+            <Typography variant="subtitle1">
+              Student's Response:
+            </Typography>
+          </Box>
+          
+          <Box sx={{ mt: 1 }}>
+            {responseAudioUrl ? (
+              <audio 
+                controls 
+                style={{ width: '100%' }}
+                src={responseAudioUrl}
+              />
+            ) : (
+              <Alert severity="error">Audio not available</Alert>
+            )}
+          </Box>
+        </Box>
+      );
+    }
+    
+    // Rasmli savol uchun
+    if (question.questionType === 'image' && question.imageUrl) {
+      return (
+        <Box>
+          <Typography variant="body1" gutterBottom>
+            {question.question}
+          </Typography>
+          
+          <Box sx={{ my: 2, textAlign: 'center' }}>
+            <img 
+              src={question.imageUrl} 
+              alt="Question" 
+              style={{ maxWidth: '100%', maxHeight: '300px', borderRadius: '4px' }} 
+            />
+          </Box>
+          
+          <Box sx={{ mt: 2, display: 'flex', alignItems: 'center' }}>
+            <Mic color="secondary" sx={{ mr: 1 }} />
+            <Typography variant="subtitle1">
+              Student's Response:
+            </Typography>
+          </Box>
+          
+          <Box sx={{ mt: 1 }}>
+            {responseAudioUrl ? (
+              <audio 
+                controls 
+                style={{ width: '100%' }}
+                src={responseAudioUrl}
+              />
+            ) : (
+              <Alert severity="error">Audio not available</Alert>
+            )}
+          </Box>
+        </Box>
+      );
+    }
+    
+    // Oddiy matnli savol uchun
+    return (
+      <Box>
+        <Typography variant="body1" gutterBottom>
+          {question.question}
+        </Typography>
+        
+        <Box sx={{ mt: 2, display: 'flex', alignItems: 'center' }}>
+          <Mic color="secondary" sx={{ mr: 1 }} />
+          <Typography variant="subtitle1">
+            Student's Response:
+          </Typography>
+        </Box>
+        
+        <Box sx={{ mt: 1 }}>
+          {responseAudioUrl ? (
+            <audio 
+              controls 
+              style={{ width: '100%' }}
+              src={responseAudioUrl}
+            />
+          ) : (
+            <Alert severity="error">Audio not available</Alert>
+          )}
+        </Box>
+      </Box>
+    );
   };
   
   if (loading) {
@@ -147,61 +279,20 @@ const AdminExamEvaluate = () => {
     </Box>;
   }
   
-  // Xato holatini tekshirish
   if (error || !exam) {
     return (
       <Container maxWidth="md">
         <Paper elevation={3} sx={{ p: 3, my: 4 }}>
-          <Box sx={{ mb: 3, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <Typography variant="h4" component="h1" color="error" gutterBottom>
-              Error Loading Exam
-            </Typography>
-            <Button
-              variant="outlined"
-              startIcon={<ArrowBack />}
-              onClick={() => navigate('/admin/exams')}
-            >
-              Back to Exams
-            </Button>
-          </Box>
-          
-          <Alert severity="error" sx={{ mb: 3 }}>
-            {error || "Failed to load exam data. Please try again."}
+          <Alert severity="error" sx={{ mb: 2 }}>
+            {error || "Failed to load exam"}
           </Alert>
-          
           <Button
             variant="contained"
-            color="primary"
-            onClick={() => window.location.reload()}
+            startIcon={<ArrowBack />}
+            onClick={() => navigate('/admin/exams')}
           >
-            Retry
+            Back to Exams
           </Button>
-        </Paper>
-      </Container>
-    );
-  }
-  
-  // ExamTemplate mavjudligini tekshirish
-  if (!exam.examTemplate) {
-    return (
-      <Container maxWidth="md">
-        <Paper elevation={3} sx={{ p: 3, my: 4 }}>
-          <Box sx={{ mb: 3, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <Typography variant="h4" component="h1" color="error" gutterBottom>
-              Invalid Exam Data
-            </Typography>
-            <Button
-              variant="outlined"
-              startIcon={<ArrowBack />}
-              onClick={() => navigate('/admin/exams')}
-            >
-              Back to Exams
-            </Button>
-          </Box>
-          
-          <Alert severity="error" sx={{ mb: 3 }}>
-            Exam template data is missing. Please contact administrator.
-          </Alert>
         </Paper>
       </Container>
     );
@@ -225,7 +316,7 @@ const AdminExamEvaluate = () => {
         
         <Box sx={{ mb: 4 }}>
           <Typography variant="h6" gutterBottom>
-            Exam: {exam.examTemplate?.title || "Unknown Exam"} {/* Optional chaining qo'shildi */}
+            Exam: {exam.examTemplate.title}
           </Typography>
           
           <Grid container spacing={2} sx={{ mb: 2 }}>
@@ -233,14 +324,13 @@ const AdminExamEvaluate = () => {
               <Box sx={{ display: 'flex', alignItems: 'center' }}>
                 <Person color="primary" sx={{ mr: 1 }} />
                 <Typography variant="body1">
-                  Student: {exam.student?.firstName || "Unknown"} {exam.student?.lastName || ""} 
-                  {exam.student?.username ? `(${exam.student.username})` : ""}
+                  Student: {exam.student.firstName} {exam.student.lastName} ({exam.student.username})
                 </Typography>
               </Box>
             </Grid>
             <Grid item xs={12} md={6}>
               <Typography variant="body1">
-                Submitted: {exam.submittedAt ? new Date(exam.submittedAt).toLocaleString() : "Unknown date"}
+                Submitted: {new Date(exam.submittedAt).toLocaleString()}
               </Typography>
             </Grid>
           </Grid>
@@ -260,7 +350,7 @@ const AdminExamEvaluate = () => {
                 <AccordionDetails>
                   <Box>
                     {partResponses.length === 0 ? (
-                      <Alert severity="info" sx={{ mb: 3 }}>
+                      <Alert severity="warning" sx={{ mb: 3 }}>
                         No responses found for Part {part}
                       </Alert>
                     ) : (
@@ -271,33 +361,8 @@ const AdminExamEvaluate = () => {
                               Question {index + 1}:
                             </Typography>
                             
-                            {item.question ? (
-                              <QuestionDisplay 
-                                question={item.question} 
-                                examState="reading"
-                              />
-                            ) : (
-                              <Alert severity="warning">Question data is missing</Alert>
-                            )}
-                            
-                            <Box sx={{ mt: 2, display: 'flex', alignItems: 'center' }}>
-                              <Mic color="secondary" sx={{ mr: 1 }} />
-                              <Typography variant="subtitle1">
-                                Student's Response:
-                              </Typography>
-                            </Box>
-                            
-                            <Box sx={{ mt: 1 }}>
-                              {item.response?.audioUrl ? (
-                                <audio 
-                                  controls 
-                                  style={{ width: '100%' }}
-                                  src={item.response.audioUrl}
-                                />
-                              ) : (
-                                <Alert severity="error">Audio not available</Alert>
-                              )}
-                            </Box>
+                            {/* Bu joyda savolni va javobni ko'rsatadigan komponentni chaqiramiz */}
+                            {renderQuestion(item.question, item.response.audioUrl)}
                           </Paper>
                         </Box>
                       ))
