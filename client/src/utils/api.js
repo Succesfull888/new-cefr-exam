@@ -15,17 +15,29 @@ export const showNotification = (message, options = {}) => {
   }
 };
 
+// Muhit o'zgaruvchisiga to'g'ri kirish
+let apiUrl = 'https://multilevel-speaking.onrender.com';
+
+// Agar REACT_APP_ prefixli env mavjud bo'lsa, uni qo'llaymiz
+if (process.env.REACT_APP_API_URL) {
+  apiUrl = process.env.REACT_APP_API_URL;
+}
+
 const api = axios.create({
-  baseURL: process.env.REACT_APP_API_URL || 'https://multilevel-speaking.onrender.com', // Default qiymat ham bering
+  baseURL: apiUrl,
   withCredentials: true
 });
 
 // Add request interceptor to attach auth token
 api.interceptors.request.use(
   config => {
-    const token = localStorage.getItem('token');
-    if (token) {
-      config.headers['x-auth-token'] = token;
+    try {
+      const token = localStorage.getItem('token');
+      if (token) {
+        config.headers['x-auth-token'] = token;
+      }
+    } catch (error) {
+      console.error('Error accessing localStorage:', error);
     }
     return config;
   },
@@ -38,20 +50,29 @@ api.interceptors.request.use(
 api.interceptors.response.use(
   response => response,
   error => {
-    const { status, data } = error.response || {};
-    
-    // Show error notification if snackbar is available
-    if (enqueueSnackbar && data && data.message) {
-      enqueueSnackbar(data.message, { 
-        variant: 'error',
-        autoHideDuration: 5000
-      });
-    }
-    
-    // Handle token expiration
-    if (status === 401) {
-      localStorage.removeItem('token');
-      window.location.href = '/login';
+    // Xavfsiz hatolik qaytish
+    try {
+      const { status, data } = error.response || {};
+      
+      // Show error notification if snackbar is available
+      if (enqueueSnackbar && data && data.message) {
+        enqueueSnackbar(data.message, { 
+          variant: 'error',
+          autoHideDuration: 5000
+        });
+      }
+      
+      // Handle token expiration
+      if (status === 401) {
+        try {
+          localStorage.removeItem('token');
+          window.location.href = '/login';
+        } catch (err) {
+          console.error('Error during logout:', err);
+        }
+      }
+    } catch (err) {
+      console.error('Error in response interceptor:', err);
     }
     
     return Promise.reject(error);
