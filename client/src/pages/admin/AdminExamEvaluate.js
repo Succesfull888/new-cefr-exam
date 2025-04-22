@@ -1,11 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Container, Box, Typography, Button, Paper, Grid, TextField, Rating, Divider, 
+import { Container, Box, Typography, Button, Paper, Grid, TextField, Divider, 
          Accordion, AccordionSummary, AccordionDetails, CircularProgress, Alert, 
          TableContainer, Table, TableHead, TableRow, TableCell, TableBody } from '@mui/material';
 import { ExpandMore, Save, ArrowBack, Person, Mic } from '@mui/icons-material';
-import api from 'utils/api';
-import QuestionDisplay from 'components/exam/QuestionDisplay';
+import api from '../../../utils/api';
 import { useSnackbar } from 'notistack';
 
 const AdminExamEvaluate = () => {
@@ -75,7 +74,7 @@ const AdminExamEvaluate = () => {
     setFeedback(updatedFeedback);
     
     // Calculate total score
-    const newTotalScore = updatedFeedback.reduce((sum, item) => sum + item.score, 0);
+    const newTotalScore = updatedFeedback.reduce((sum, item) => sum + Number(item.score), 0);
     setTotalScore(newTotalScore);
   };
   
@@ -122,20 +121,26 @@ const AdminExamEvaluate = () => {
     }
     
     // 2. Eski responses formatidan olish
-    const partQuestions = exam.examTemplate.questions.filter(q => q.part === part);
-    const partResponses = [];
+    if (exam.examTemplate && exam.examTemplate.questions) {
+      const partQuestions = exam.examTemplate.questions.filter(q => q.part === part);
+      const partResponses = [];
+      
+      partQuestions.forEach(question => {
+        if (exam.responses) {
+          const response = exam.responses.find(r => r.questionId === question._id);
+          if (response) {
+            partResponses.push({
+              question,
+              response
+            });
+          }
+        }
+      });
+      
+      return partResponses;
+    }
     
-    partQuestions.forEach(question => {
-      const response = exam.responses.find(r => r.questionId === question._id);
-      if (response) {
-        partResponses.push({
-          question,
-          response
-        });
-      }
-    });
-    
-    return partResponses;
+    return [];
   };
   
   // Savol va uning ma'lumotlarini ko'rsatadigan komponent
@@ -269,7 +274,7 @@ const AdminExamEvaluate = () => {
             />
           ) : (
             <Alert severity="error">Audio not available</Alert>
-          )}
+            )}
         </Box>
       </Box>
     );
@@ -318,7 +323,7 @@ const AdminExamEvaluate = () => {
         
         <Box sx={{ mb: 4 }}>
           <Typography variant="h6" gutterBottom>
-            Exam: {exam.examTemplate.title}
+            Exam: {exam?.examTemplate?.title || "Unknown Exam"}
           </Typography>
           
           <Grid container spacing={2} sx={{ mb: 2 }}>
@@ -326,13 +331,13 @@ const AdminExamEvaluate = () => {
               <Box sx={{ display: 'flex', alignItems: 'center' }}>
                 <Person color="primary" sx={{ mr: 1 }} />
                 <Typography variant="body1">
-                  Student: {exam.student.firstName} {exam.student.lastName} ({exam.student.username})
+                  Student: {exam.student?.firstName || ""} {exam.student?.lastName || ""} ({exam.student?.username || ""})
                 </Typography>
               </Box>
             </Grid>
             <Grid item xs={12} md={6}>
               <Typography variant="body1">
-                Submitted: {new Date(exam.submittedAt).toLocaleString()}
+                Submitted: {exam.submittedAt ? new Date(exam.submittedAt).toLocaleString() : "N/A"}
               </Typography>
             </Grid>
           </Grid>
@@ -363,7 +368,6 @@ const AdminExamEvaluate = () => {
                               Question {index + 1}:
                             </Typography>
                             
-                            {/* Bu joyda savolni va javobni ko'rsatadigan komponentni chaqiramiz */}
                             {renderQuestion(item.question, item.response.audioUrl)}
                           </Paper>
                         </Box>
